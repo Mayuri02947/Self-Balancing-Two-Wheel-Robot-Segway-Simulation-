@@ -1,0 +1,107 @@
+A ROS2 + Gazebo simulation of a self-balancing two-wheel robot (Segway-style) using PID control and IMU-based sensor fusion.
+
+
+Project Overview
+
+This project simulates an inverted pendulum two-wheel robot that balances itself upright using real-time IMU feedback and a PID controller. The robot is controlled by user keyboard input which shifts the balance setpoint to produce forward, backward, and turning motion — exactly like a real Segway.
+
+Objective: Simulate a robot that balances itself like a Segway using ROS2, Gazebo, and Python.
+
+
+Features
+
+
+PID control loop for real-time balance correction
+IMU-based sensor fusion using a Complementary Filter (gyroscope + accelerometer)
+Quaternion-based pitch angle estimation for accurate tilt detection
+Differential drive simulation via Gazebo plugin
+User-controlled navigation (forward, backward, left, right) via keyboard
+Tunable PID parameters at runtime without rebuilding
+Custom Gazebo world with optimized physics timestep (1000 Hz) for stable simulation
+
+
+
+System Architecture
+
+[IMU Sensor] --> /imu_plugin/out --> [Balance Controller Node]
+                                          |
+[User Nav Node] --> /user_cmd_vel ------->|
+                                          |
+                                     [PID + Filter]
+                                          |
+                                     /cmd_vel --> [Gazebo Diff Drive Plugin]
+                                                         |
+                                                   [Robot Motion]
+
+
+Tech Stack
+
+ToolVersionPurposeROS2HumbleRobot middlewareGazeboClassic 11Physics simulationPython3.10Node implementationUbuntu22.04Operating system
+
+
+Package Structure
+
+self_balance_robot/
+├── self_balance_robot/
+│   ├── __init__.py
+│   ├── balance_controller.py    # PID + Complementary Filter node
+│   └── user_nav.py              # Keyboard navigation node
+├── urdf/
+│   └── self_balance.urdf        # Robot model (base + 2 wheels + IMU)
+├── launch/
+│   └── balance_sim.launch.py    # Full simulation launch file
+├── worlds/
+│   └── balance.world            # Gazebo world with physics config
+├── setup.py
+├── package.xml
+└── README.md
+
+
+Control Theory
+
+PID Controller
+
+The balance controller uses a PID (Proportional-Integral-Derivative) controller:
+
+output = Kp * error + Ki * integral(error) + Kd * d(error)/dt
+
+ParameterValueRoleKp4.0Proportional — main correction forceKi0.01Integral — eliminates steady-state leanKd0.6Derivative — dampens oscillationsOutput limit±2.0 m/sPrevents overcorrection
+
+Sensor Fusion — Complementary Filter
+
+Raw IMU data is noisy. A complementary filter fuses:
+
+
+Gyroscope — accurate short-term rate, drifts over time
+Accelerometer — accurate long-term angle, noisy short-term
+
+
+angle = alpha * (angle + gyro_rate * dt) + (1 - alpha) * accel_angle
+alpha = 0.98
+
+Pitch Estimation — Quaternion Method
+
+Instead of raw accelerometer math, pitch is extracted from the IMU orientation quaternion for higher accuracy:
+
+pythonsinp = 2.0 * (w * y - z * x)
+pitch = asin(sinp)
+
+Navigation via Setpoint Shifting
+
+User input shifts the balance target angle slightly, making the robot lean and therefore move — exactly like a real Segway:
+
+target = target_angle + user_speed * 0.1
+error  = target - pitch
+
+
+Robot URDF Description
+
+The robot model consists of:
+
+
+Base link — tall, top-heavy body (0.1 x 0.1 x 0.3 m), mass 1.0 kg
+Left wheel — continuous joint, radius 0.05 m
+Right wheel — continuous joint, radius 0.05 m
+IMU link — fixed at top of body (0.15 m above center)
+Diff drive plugin — wheel separation 0.16 m
+IMU plugin — 100 Hz update rate
